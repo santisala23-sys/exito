@@ -14,6 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   // --- ESTADOS PARA ACCESOS RÁPIDOS ---
+  const [cigLogsToday, setCigLogsToday] = useState([]); // Guarda el historial de hoy
   const [cigStatus, setCigStatus] = useState(''); 
   const [showParking, setShowParking] = useState(false);
   const [parkingLoc, setParkingLoc] = useState('');
@@ -24,40 +25,21 @@ export default function Home() {
     async function initData() {
       const today = getToday();
 
-      // 1. Tasks Pendientes (Solo de hoy, atrasadas o sin fecha)
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('completed', false)
-        .or(`due_date.lte.${today},due_date.is.null`);
-      
+      // 1. Tasks Pendientes 
+      const { data: tasksData } = await supabase.from('tasks').select('*').eq('completed', false).or(`due_date.lte.${today},due_date.is.null`);
       const tasksCount = tasksData ? tasksData.length : 0;
 
-      // 2. Otros (Hábitos diarios faltantes)
+      // 2. Otros (Hábitos)
       const { data: allHabits } = await supabase.from('custom_tasks').select('id');
-      const { data: doneHabits } = await supabase
-        .from('daily_task_logs')
-        .select('task_id')
-        .eq('date', today)
-        .eq('completed', true);
-      
+      const { data: doneHabits } = await supabase.from('daily_task_logs').select('task_id').eq('date', today).eq('completed', true);
       const otrosCount = (allHabits?.length || 0) - (doneHabits?.length || 0);
 
-      // 3. Entrenamiento (¿Hice algo hoy?)
-      const { count: workoutDone } = await supabase
-        .from('workout_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('date', today);
-      
+      // 3. Entrenamiento
+      const { count: workoutDone } = await supabase.from('workout_logs').select('*', { count: 'exact', head: true }).eq('date', today);
       const entrenamientoCount = workoutDone > 0 ? 0 : 1;
 
-      // 4. Nutrición (Comidas faltantes)
-      const { count: mealsDone } = await supabase
-        .from('meal_plan')
-        .select('*', { count: 'exact', head: true })
-        .eq('date', today)
-        .eq('completed', true);
-      
+      // 4. Nutrición
+      const { count: mealsDone } = await supabase.from('meal_plan').select('*', { count: 'exact', head: true }).eq('date', today).eq('completed', true);
       const nutricionCount = 4 - (mealsDone || 0);
 
       setPendientes({
@@ -74,6 +56,21 @@ export default function Home() {
         setParkingInput(parkData.location === 'No registrado' ? '' : parkData.location);
       }
 
+      // 6. Cargar historial de cigarros de HOY (ajustado a zona horaria argentina)
+      const { data: cigData } = await supabase.from('cigarettes_log').select('id, created_at').order('created_at', { ascending: false }).limit(100);
+      if (cigData) {
+        const todaysLogs = cigData.filter(log => {
+          const logDateStr = new Date(log.created_at).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+          const argD = new Date(logDateStr);
+          const yyyy = argD.getFullYear();
+          const mm = String(argD.getMonth() + 1).padStart(2, '0');
+          const dd = String(argD.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}` === today;
+        });
+        // Invertimos para que el último del array sea el más reciente
+        setCigLogsToday(todaysLogs.reverse());
+      }
+
       setLoading(false);
     }
 
@@ -82,11 +79,12 @@ export default function Home() {
 
   const totalPendientes = pendientes.tasks + pendientes.otros + pendientes.entrenamiento + pendientes.nutricion;
 
-  // --- FUNCIONES DE ACCESOS RÁPIDOS ---
+  // --- FUNCIONES DE CIGARRILLOS ---
   const logCigarette = async () => {
     setCigStatus('⏳');
-    const { error } = await supabase.from('cigarettes_log').insert([{}]); 
-    if (!error) {
+    const { data, error } = await supabase.from('cigarettes_log').insert([{}]).select(); 
+    if (!error && data) {
+      setCigLogsToday([...cigLogsToday, data[0]]);
       setCigStatus('✅ Registrado');
       setTimeout(() => setCigStatus(''), 2000); 
     } else {
@@ -95,6 +93,23 @@ export default function Home() {
     }
   };
 
+  const undoCigarette = async () => {
+    if (cigLogsToday.length === 0) return;
+    setCigStatus('⏳');
+    const lastLog = cigLogsToday[cigLogsToday.length - 1]; // Agarra el último registrado
+    
+    const { error } = await supabase.from('cigarettes_log').delete().eq('id', lastLog.id);
+    if (!error) {
+      setCigLogsToday(cigLogsToday.slice(0, -1)); // Lo saca de la pantalla
+      setCigStatus('🗑️ Borrado');
+      setTimeout(() => setCigStatus(''), 2000);
+    } else {
+      setCigStatus('❌ Error');
+      setTimeout(() => setCigStatus(''), 2000);
+    }
+  };
+
+  // --- FUNCIONES DE ESTACIONAMIENTO ---
   const toggleParking = () => {
     setShowParking(!showParking);
     setParkingStatus('');
@@ -130,7 +145,6 @@ export default function Home() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
         
-        {/* TASKS */}
         <Link href="/tasks" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -143,7 +157,6 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* ENTRENAMIENTO */}
         <Link href="/entrenamiento" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -156,7 +169,6 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* NUTRICION */}
         <Link href="/nutricion" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#f3f4f6', color: '#000', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -169,7 +181,6 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* OTROS */}
         <Link href="/otros" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#374151', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -182,7 +193,6 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* BOTÓN ANALÍTICA */}
         <Link href="/analitica" style={{ textDecoration: 'none', display: 'block', marginTop: '1.5rem' }}>
           <div style={{ padding: '1.5rem', backgroundColor: '#111', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
             <span style={{ fontSize: '1.5rem' }}>📊</span>
@@ -196,39 +206,53 @@ export default function Home() {
       <div style={{ marginTop: '3rem', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
         <h3 style={{ fontSize: '1rem', color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem', textAlign: 'center' }}>Accesos Rápidos</h3>
         
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '30px' }}>
           
           {/* BOTÓN CIGARRO */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
               onClick={logCigarette}
-              style={{ width: '65px', height: '65px', borderRadius: '20px', border: '1px solid #eee', backgroundColor: '#f9fafb', fontSize: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}
+              style={{ width: '65px', height: '65px', borderRadius: '20px', border: '1px solid #eee', backgroundColor: '#f9fafb', fontSize: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', position: 'relative' }}
             >
               🚬
+              {cigLogsToday.length > 0 && (
+                <span style={{ position: 'absolute', top: '-8px', right: '-8px', backgroundColor: '#111', color: '#fff', fontSize: '0.8rem', fontWeight: '900', width: '26px', height: '26px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: '50%', border: '2px solid #fff' }}>
+                  {cigLogsToday.length}
+                </span>
+              )}
             </button>
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cigStatus.includes('✅') ? '#166534' : '#666', height: '15px' }}>
-              {cigStatus || 'Fumar'}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '40px', justifyContent: 'flex-start', marginTop: '5px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cigStatus.includes('✅') ? '#166534' : (cigStatus.includes('🗑️') ? '#991b1b' : '#666') }}>
+                {cigStatus || (cigLogsToday.length > 0 ? 'Fumados' : 'Fumar')}
+              </span>
+              {!cigStatus && cigLogsToday.length > 0 && (
+                <button onClick={undoCigarette} style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: '#ef4444', cursor: 'pointer', padding: 0, marginTop: '2px', textDecoration: 'underline' }}>
+                  Deshacer
+                </button>
+              )}
+            </div>
           </div>
 
           {/* BOTÓN ESTACIONAMIENTO */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
               onClick={toggleParking}
               style={{ width: '65px', height: '65px', borderRadius: '20px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontSize: '1.8rem', fontWeight: '900', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(37,99,235,0.3)' }}
             >
               E
             </button>
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#666', height: '15px' }}>
-              Auto
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '40px', justifyContent: 'flex-start', marginTop: '5px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#666' }}>
+                Auto
+              </span>
+            </div>
           </div>
 
         </div>
 
         {/* CAJÓN DESPLEGABLE DE ESTACIONAMIENTO */}
         {showParking && (
-          <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
+          <div style={{ marginTop: '0.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>
               Última ubicación: <strong style={{ color: '#111' }}>{parkingLoc}</strong>
             </p>
