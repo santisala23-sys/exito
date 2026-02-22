@@ -17,11 +17,14 @@ export default function Home() {
     async function calcularPendientes() {
       const today = getToday();
 
-      // 1. Tasks Pendientes
-      const { count: tasksCount } = await supabase
+      // 1. Tasks Pendientes (Solo de hoy, atrasadas o sin fecha)
+      const { data: tasksData } = await supabase
         .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .eq('completed', false);
+        .select('*')
+        .eq('completed', false)
+        .or(`due_date.lte.${today},due_date.is.null`);
+      
+      const tasksCount = tasksData ? tasksData.length : 0;
 
       // 2. Otros (Hábitos diarios faltantes)
       const { data: allHabits } = await supabase.from('custom_tasks').select('id');
@@ -51,7 +54,7 @@ export default function Home() {
       const nutricionCount = 4 - (mealsDone || 0);
 
       setPendientes({
-        tasks: tasksCount || 0,
+        tasks: tasksCount,
         otros: otrosCount < 0 ? 0 : otrosCount,
         entrenamiento: entrenamientoCount,
         nutricion: nutricionCount
@@ -81,7 +84,7 @@ export default function Home() {
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>📝 Tasks</span>
-              <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Pendientes únicas</span>
+              <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>Para hoy</span>
             </div>
             <span style={{ fontSize: '1.5rem', fontWeight: '900', backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px 20px', borderRadius: '18px' }}>
               {pendientes.tasks}
@@ -127,13 +130,14 @@ export default function Home() {
             </span>
           </button>
         </Link>
+
         {/* BOTÓN ANALÍTICA */}
-      <Link href="/analitica" style={{ textDecoration: 'none', display: 'block', marginTop: '1.5rem' }}>
-        <div style={{ padding: '1.5rem', backgroundColor: '#111', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
-          <span style={{ fontSize: '1.5rem' }}>📊</span>
-          <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '800', color: '#fff' }}>Ver mis métricas</h2>
-        </div>
-      </Link>
+        <Link href="/analitica" style={{ textDecoration: 'none', display: 'block', marginTop: '1.5rem' }}>
+          <div style={{ padding: '1.5rem', backgroundColor: '#111', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
+            <span style={{ fontSize: '1.5rem' }}>📊</span>
+            <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '800', color: '#fff' }}>Ver mis métricas</h2>
+          </div>
+        </Link>
 
       </div>
 

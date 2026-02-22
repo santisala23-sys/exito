@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getToday } from '../../lib/time';
 import Link from 'next/link';
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [newTitle, setNewTitle] = useState('');
+  const [newDate, setNewDate] = useState(getToday()); // Por defecto carga la fecha de hoy
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
@@ -16,8 +18,7 @@ export default function Tasks() {
     const { data } = await supabase
       .from('tasks')
       .select('*')
-      .eq('completed', false)
-      .order('created_at', { ascending: false });
+      .eq('completed', false);
     if (data) setTasks(data);
   }
 
@@ -28,34 +29,36 @@ export default function Tasks() {
     
     const { data, error } = await supabase
       .from('tasks')
-      .insert([{ title: newTitle.trim() }])
+      .insert([{ 
+        title: newTitle.trim(), 
+        due_date: newDate || null,
+        priority: 0 
+      }])
       .select();
 
     if (!error) {
-      setTasks([data[0], ...tasks]);
+      setTasks([...tasks, data[0]]);
       setNewTitle('');
     }
   };
 
   const completeTask = async (id, title) => {
-    // Pedimos confirmación para no tildar por error
     if (window.confirm(`¿Seguro que terminaste: "${title}"?`)) {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ completed: true })
-        .eq('id', id);
-
-      if (!error) {
-        setTasks(tasks.filter(t => t.id !== id));
-      }
+      const { error } = await supabase.from('tasks').update({ completed: true }).eq('id', id);
+      if (!error) setTasks(tasks.filter(t => t.id !== id));
     }
   };
 
-  // --- EDICIÓN ---
-  const updateTaskTitle = async (id, newTitle) => {
-    if (!newTitle.trim()) return;
-    await supabase.from('tasks').update({ title: newTitle.trim() }).eq('id', id);
-    setTasks(tasks.map(t => t.id === id ? { ...t, title: newTitle.trim() } : t));
+  // --- EDICIÓN Y PRIORIDAD ---
+  const updateTask = async (id, field, value) => {
+    await supabase.from('tasks').update({ [field]: value }).eq('id', id);
+    setTasks(tasks.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const changePriority = async (id, currentPriority, change) => {
+    const newPriority = (currentPriority || 0) + change;
+    await supabase.from('tasks').update({ priority: newPriority }).eq('id', id);
+    setTasks(tasks.map(t => t.id === id ? { ...t, priority: newPriority } : t));
   };
 
   const deleteTask = async (id) => {
@@ -65,8 +68,21 @@ export default function Tasks() {
     }
   };
 
+  // --- FILTROS (Separar Hoy de Próximas) ---
+  const todayStr = getToday();
+  
+  // Tareas de Hoy o Atrasadas (Ordenadas por prioridad mayor a menor)
+  const todayTasks = tasks
+    .filter(t => !t.due_date || t.due_date <= todayStr)
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+  // Tareas del futuro (Ordenadas por fecha más próxima)
+  const futureTasks = tasks
+    .filter(t => t.due_date && t.due_date > todayStr)
+    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
   return (
-    <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh' }}>
+    <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh', boxSizing: 'border-box' }}>
       
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <Link href="/" style={{ textDecoration: 'none', color: '#999', fontWeight: '600' }}>← Volver</Link>
@@ -74,75 +90,115 @@ export default function Tasks() {
           onClick={() => setEditMode(!editMode)}
           style={{ padding: '8px 16px', borderRadius: '16px', border: 'none', backgroundColor: editMode ? '#ef4444' : '#f3f4f6', color: editMode ? '#fff' : '#000', fontWeight: 'bold', cursor: 'pointer' }}
         >
-          {editMode ? 'Terminar Edición' : '⚙️ Editar Tareas'}
+          {editMode ? 'Terminar Edición' : '⚙️ Editar'}
         </button>
       </header>
 
       <h1 style={{ fontSize: '2.5rem', fontWeight: '900', margin: '0 0 2rem 0', letterSpacing: '-0.05em' }}>
-        {editMode ? 'Editar Tareas' : 'Tareas Pendientes'}
+        {editMode ? 'Gestión de Tareas' : 'Pendientes'}
       </h1>
 
-      <form onSubmit={addTask} style={{ display: 'flex', gap: '10px', marginBottom: '2.5rem' }}>
+      <form onSubmit={addTask} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2.5rem', backgroundColor: '#f9fafb', padding: '1.5rem', borderRadius: '24px' }}>
         <input 
           type="text" 
           placeholder="¿Qué hay que hacer?" 
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
-          style={{ flex: 1, padding: '1.2rem', borderRadius: '18px', border: '1px solid #eee', fontSize: '1rem', outline: 'none', backgroundColor: '#f9fafb' }}
+          style={{ width: '100%', padding: '1.2rem', borderRadius: '16px', border: '1px solid #eee', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
         />
-        <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '18px', fontWeight: 'bold' }}>
-          +
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input 
+            type="date" 
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #eee', color: '#666', outline: 'none', fontFamily: 'inherit' }}
+          />
+          <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold' }}>
+            Añadir
+          </button>
+        </div>
       </form>
 
       {!editMode ? (
         /* VISTA NORMAL */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {tasks.map(task => (
-            <div 
-              key={task.id}
-              onClick={() => completeTask(task.id, task.title)}
-              style={{
-                padding: '1.5rem',
-                borderRadius: '20px',
-                border: '1px solid #f3f4f6',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#fff',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
-              }}>
-              <span style={{ fontWeight: '600', color: '#111', fontSize: '1.05rem' }}>{task.title}</span>
-              <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></div>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+          
+          {/* BLOQUE HOY */}
+          <div>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: '800', marginBottom: '1rem', color: '#111' }}>📍 Hoy / Atrasadas</h2>
+            {todayTasks.length === 0 ? (
+              <p style={{ color: '#999', fontSize: '0.9rem', fontStyle: 'italic' }}>Todo al día.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {todayTasks.map(task => (
+                  <div key={task.id} onClick={() => completeTask(task.id, task.title)} style={{ padding: '1.2rem 1.5rem', borderRadius: '20px', border: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: '600', color: '#111', fontSize: '1.05rem' }}>{task.title}</span>
+                      {task.due_date && task.due_date < todayStr && <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>⚠️ Atrasada</span>}
+                    </div>
+                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {tasks.length === 0 && (
-            <div style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', backgroundColor: '#f0fdf4', borderRadius: '24px' }}>
-              <span style={{ fontSize: '3rem' }}>🏖️</span>
-              <p style={{ color: '#166534', marginTop: '1rem', fontWeight: 'bold' }}>¡Todo al día!</p>
+          {/* BLOQUE PRÓXIMAS */}
+          {futureTasks.length > 0 && (
+            <div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: '800', marginBottom: '1rem', color: '#999' }}>🗓️ Próximas</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {futureTasks.map(task => {
+                  const [y, m, d] = task.due_date.split('-');
+                  return (
+                    <div key={task.id} onClick={() => completeTask(task.id, task.title)} style={{ padding: '1rem 1.5rem', borderRadius: '20px', border: '1px dashed #eee', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fafafa', opacity: 0.8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: '500', color: '#666', fontSize: '1rem' }}>{task.title}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#999', marginTop: '2px' }}>Para el {d}/{m}</span>
+                      </div>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid #ddd', flexShrink: 0 }}></div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
+
       ) : (
+
         /* MODO EDICIÓN */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <p style={{ color: '#666', marginBottom: '1rem' }}>Modificá el texto y tocá afuera para guardar, o eliminalas definitivamente.</p>
-          {tasks.map(task => (
-            <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input 
-                type="text" 
-                defaultValue={task.title}
-                onBlur={(e) => updateTaskTitle(task.id, e.target.value)}
-                style={{ flex: 1, padding: '1.2rem', borderRadius: '16px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none' }}
-              />
-              <button 
-                onClick={() => deleteTask(task.id)}
-                style={{ padding: '1.2rem', backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                🗑️
-              </button>
+          <p style={{ color: '#666', marginBottom: '1rem' }}>Ajustá el nombre, la fecha, o usá las flechas para subir/bajar la prioridad de las tareas de hoy.</p>
+          {tasks.sort((a,b) => (b.priority || 0) - (a.priority || 0)).map(task => (
+            <div key={task.id} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="text" 
+                  defaultValue={task.title}
+                  onBlur={(e) => updateTask(task.id, 'title', e.target.value)}
+                  style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none', minWidth: 0 }}
+                />
+                <button 
+                  onClick={() => deleteTask(task.id)}
+                  style={{ padding: '0.8rem 1rem', backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}
+                >🗑️</button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input 
+                  type="date" 
+                  defaultValue={task.due_date || ''}
+                  onBlur={(e) => updateTask(task.id, 'due_date', e.target.value || null)}
+                  style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', color: '#666', minWidth: 0, fontFamily: 'inherit' }}
+                />
+                <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+                  <button onClick={() => changePriority(task.id, task.priority, 1)} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid #ddd', backgroundColor: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>🔼</button>
+                  <button onClick={() => changePriority(task.id, task.priority, -1)} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid #ddd', backgroundColor: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>🔽</button>
+                </div>
+              </div>
+
             </div>
           ))}
         </div>
