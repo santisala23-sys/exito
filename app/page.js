@@ -127,6 +127,13 @@ export default function Home() {
             </span>
           </button>
         </Link>
+        {/* BOTÓN ANALÍTICA */}
+      <Link href="/analitica" style={{ textDecoration: 'none', display: 'block', marginTop: '1.5rem' }}>
+        <div style={{ padding: '1.5rem', backgroundColor: '#111', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}>
+          <span style={{ fontSize: '1.5rem' }}>📊</span>
+          <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '800', color: '#fff' }}>Ver mis métricas</h2>
+        </div>
+      </Link>
 
       </div>
 
