@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getToday, getArgDay } from '../../lib/time';
 import { supabase } from '../../lib/supabase';
 import Link from 'next/link';
 
@@ -15,14 +16,14 @@ export default function Nutricion() {
 
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const tipos = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
-  const diaHoy = dias[new Date().getDay()];
+  const diaHoy = dias[getArgDay()];
 
   useEffect(() => {
     fetchData();
   }, []);
 
   async function fetchData() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getToday();
     
     const { data: recs } = await supabase.from('recipes').select('*');
     const { data: inv } = await supabase.from('pantry_inventory').select('*').order('ingredient', { ascending: true });
@@ -51,7 +52,7 @@ export default function Nutricion() {
   }
 
   const registrarComida = async (tipo, plato) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getToday();
     const isCompleted = !registroComidas[tipo];
     
     setRegistroComidas({ ...registroComidas, [tipo]: isCompleted });

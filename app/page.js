@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { getToday } from '../lib/time';
 import Link from 'next/link';
 
 export default function Home() {
@@ -14,7 +15,7 @@ export default function Home() {
 
   useEffect(() => {
     async function calcularPendientes() {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getToday();
 
       // 1. Tasks Pendientes
       const { count: tasksCount } = await supabase

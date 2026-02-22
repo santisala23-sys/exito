@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getToday } from '../../lib/time';
 import Link from 'next/link';
 
 export default function Entrenamiento() {
@@ -16,10 +17,9 @@ export default function Entrenamiento() {
   }, []);
 
   async function fetchData() {
-    // 1. Traer configuración de ejercicios
     const { data: t } = await supabase.from('workout_types').select('*').order('created_at');
     
-    // 2. Traer registros de los últimos 31 días (para poder calcular metas mensuales y semanales)
+    // Obtenemos los registros de los últimos 31 días (aproximado para la vista mensual)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 31);
     const dateString = thirtyDaysAgo.toISOString().split('T')[0];
@@ -31,19 +31,29 @@ export default function Entrenamiento() {
     setLoading(false);
   }
 
-  // --- LÓGICA DE PROGRESO ---
+  // --- LÓGICA DE PROGRESO (Ajustada a hora Argentina) ---
   const calcularProgreso = (exName, period) => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    // Usamos getToday() para saber qué día es hoy en Argentina
+    const todayStr = getToday(); 
     
-    // Lunes de esta semana
-    const startOfWeek = new Date(today);
-    const day = startOfWeek.getDay() || 7; 
-    startOfWeek.setDate(today.getDate() - day + 1);
-    const weekStr = startOfWeek.toISOString().split('T')[0];
+    // Convertimos ese string ('YYYY-MM-DD') en un objeto Date para poder operar (saber si es lunes, etc.)
+    const parts = todayStr.split('-');
+    // Atención: el mes en JS arranca en 0 (Enero=0), por eso parts[1] - 1
+    const todayArg = new Date(parts[0], parts[1] - 1, parts[2]); 
+    
+    // Calcular el inicio de esta semana (Lunes)
+    const startOfWeek = new Date(todayArg);
+    const dayOfWeek = startOfWeek.getDay() || 7; // Si es domingo (0), lo tomamos como 7
+    startOfWeek.setDate(todayArg.getDate() - dayOfWeek + 1);
+    
+    // Formatear el Lunes a YYYY-MM-DD para comparar con Supabase
+    const yWeek = startOfWeek.getFullYear();
+    const mWeek = String(startOfWeek.getMonth() + 1).padStart(2, '0');
+    const dWeek = String(startOfWeek.getDate()).padStart(2, '0');
+    const weekStr = `${yWeek}-${mWeek}-${dWeek}`;
 
-    // Día 1 de este mes
-    const monthStr = today.toISOString().slice(0, 8) + '01';
+    // Calcular el día 1 del mes actual
+    const monthStr = `${parts[0]}-${parts[1]}-01`;
 
     return logs.filter(log => {
       if (log.exercise !== exName) return false;
@@ -54,9 +64,11 @@ export default function Entrenamiento() {
     }).reduce((acc, curr) => acc + curr.amount, 0);
   };
 
-  // --- REGISTRAR HOY ---
+  // --- REGISTRAR HOY (Ajustado a hora Argentina) ---
   const guardarTodo = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    // Usamos la hora de Argentina para guardar en la DB
+    const today = getToday(); 
+    
     const newLogs = Object.entries(form)
       .filter(([_, val]) => val !== '' && val !== null && val > 0)
       .map(([exercise, amount]) => ({
@@ -71,7 +83,10 @@ export default function Entrenamiento() {
     if (!error) {
       alert('¡Entrenamiento registrado! 💪');
       setForm({});
-      fetchData(); // Recargar para actualizar barritas
+      fetchData(); 
+    } else {
+      console.error(error);
+      alert('Error al guardar.');
     }
   };
 

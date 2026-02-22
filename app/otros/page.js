@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getToday } from '../../lib/time';
 import { supabase } from '../../lib/supabase';
 import Link from 'next/link';
 
@@ -20,7 +21,7 @@ export default function Otros() {
   }
 
   async function fetchDailyLogs() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getToday();
     const { data } = await supabase.from('daily_task_logs').select('task_id, completed').eq('date', today);
     if (data) {
       const mapping = {};
@@ -33,7 +34,7 @@ export default function Otros() {
   const completeTask = async (taskId, taskName) => {
     const confirmar = window.confirm(`¿Terminaste de "${taskName}"?`);
     if (confirmar) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getToday();
       const { error } = await supabase.from('daily_task_logs').upsert({
         date: today,
         task_id: taskId,
@@ -45,7 +46,7 @@ export default function Otros() {
   };
 
   const undoTask = async (taskId) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getToday();
     const { error } = await supabase.from('daily_task_logs').upsert({
       date: today,
       task_id: taskId,
