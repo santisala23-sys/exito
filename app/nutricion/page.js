@@ -5,13 +5,12 @@ import Link from 'next/link';
 
 export default function Nutricion() {
   const [recipes, setRecipes] = useState([]);
-  const [uniqueRecipes, setUniqueRecipes] = useState([]); // El Recetario automático
+  const [uniqueRecipes, setUniqueRecipes] = useState([]); 
   const [inventario, setInventario] = useState([]);
   const [registroComidas, setRegistroComidas] = useState({});
   const [editMode, setEditMode] = useState(false);
   const [newIngredient, setNewIngredient] = useState('');
   
-  // Estado para saber qué ranura de comida estamos escribiendo a mano
   const [showCustomInput, setShowCustomInput] = useState({}); 
 
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -31,8 +30,6 @@ export default function Nutricion() {
 
     if (recs) {
       setRecipes(recs);
-      
-      // Armamos el Recetario Maestro sin duplicados
       const unique = [];
       const map = new Map();
       recs.forEach(r => {
@@ -53,7 +50,6 @@ export default function Nutricion() {
     }
   }
 
-  // --- FUNCIONES DE COMIDAS ---
   const registrarComida = async (tipo, plato) => {
     const today = new Date().toISOString().split('T')[0];
     const isCompleted = !registroComidas[tipo];
@@ -70,15 +66,21 @@ export default function Nutricion() {
 
   const getRecipe = (day, type) => recipes.find(r => r.day_of_week === day && r.meal_type === type);
 
-  const saveRecipe = async (day, type, name, ingredientsString) => {
-    // Si el nombre está vacío, borramos esa comida del plan
+  // Modificado para aceptar tanto Strings (del dropdown de recetas) como Arrays (del nuevo selector)
+  const saveRecipe = async (day, type, name, ingredientsParam) => {
     if (!name || name.trim() === '') {
       await supabase.from('recipes').delete().match({ day_of_week: day, meal_type: type });
       fetchData();
       return;
     }
 
-    const ingArray = ingredientsString.split(',').map(i => i.trim()).filter(i => i);
+    let ingArray = [];
+    if (Array.isArray(ingredientsParam)) {
+      ingArray = ingredientsParam;
+    } else if (typeof ingredientsParam === 'string') {
+      ingArray = ingredientsParam.split(',').map(i => i.trim()).filter(i => i);
+    }
+
     const existing = getRecipe(day, type);
 
     if (existing) {
@@ -96,7 +98,6 @@ export default function Nutricion() {
     );
   };
 
-  // --- FUNCIONES DE HELADERA ---
   const toggleStock = async (id, currentStatus) => {
     setInventario(inventario.map(item => item.id === id ? { ...item, in_stock: !currentStatus } : item));
     await supabase.from('pantry_inventory').update({ in_stock: !currentStatus }).eq('id', id);
@@ -131,7 +132,7 @@ export default function Nutricion() {
       </header>
 
       {!editMode ? (
-        /* VISTA DIARIA Y HELADERA (Sin cambios visuales, funciona igual) */
+        /* VISTA DIARIA Y HELADERA */
         <>
           <h1 style={{ fontSize: '2.5rem', fontWeight: '900', margin: '0 0 2rem 0', letterSpacing: '-0.05em' }}>Hoy: {diaHoy}</h1>
           
@@ -198,10 +199,10 @@ export default function Nutricion() {
         </>
       ) : (
 
-        /* MODO EDICIÓN SEMANAL (¡El nuevo poder!) */
+        /* MODO EDICIÓN SEMANAL */
         <>
           <h1 style={{ fontSize: '2.5rem', fontWeight: '900', margin: '0 0 1rem 0', letterSpacing: '-0.05em' }}>Planificador</h1>
-          <p style={{ color: '#666', marginBottom: '2rem' }}>Elegí una receta de tu historial o tocá "Escribir otro plato" para inventar una nueva.</p>
+          <p style={{ color: '#666', marginBottom: '2rem' }}>Elegí una receta de tu historial o armá una a medida seleccionando ingredientes de tu heladera.</p>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {dias.map(day => (
@@ -214,15 +215,13 @@ export default function Nutricion() {
                   {tipos.map(type => {
                     const r = getRecipe(day, type);
                     const slotKey = `${day}-${type}`;
-                    const isCustom = showCustomInput[slotKey]; // ¿Está escribiendo a mano?
+                    const isCustom = showCustomInput[slotKey];
 
                     return (
                       <div key={type} style={{ padding: '1rem', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #eee' }}>
                         
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                           <label style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: '#000' }}>{type}</label>
-                          
-                          {/* Botón para forzar escritura a mano si quiere modificar algo puntual */}
                           {r && !isCustom && (
                             <button 
                               onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: true})} 
@@ -235,7 +234,6 @@ export default function Nutricion() {
                         
                         {!isCustom ? (
                           <>
-                            {/* EL DROPDOWN DEL RECETARIO */}
                             <select
                               value={r?.recipe_name || ''}
                               onChange={(e) => {
@@ -243,13 +241,10 @@ export default function Nutricion() {
                                 if (val === 'NEW') {
                                   setShowCustomInput({...showCustomInput, [slotKey]: true});
                                 } else if (val === '') {
-                                  saveRecipe(day, type, '', ''); // Vacía el día
+                                  saveRecipe(day, type, '', []); 
                                 } else {
-                                  // Autocompletado mágico desde el recetario
                                   const found = uniqueRecipes.find(ur => ur.name === val);
-                                  if (found) {
-                                    saveRecipe(day, type, found.name, found.ingredients.join(', '));
-                                  }
+                                  if (found) saveRecipe(day, type, found.name, found.ingredients);
                                 }
                               }}
                               style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#f9fafb', fontSize: '1rem', outline: 'none', marginBottom: r ? '8px' : '0' }}
@@ -261,39 +256,97 @@ export default function Nutricion() {
                               <option value="NEW" style={{ fontWeight: 'bold', color: '#5D5CDE' }}>➕ Escribir otro plato...</option>
                             </select>
 
-                            {/* Mostrar ingredientes en modo lectura si eligió algo del select */}
                             {r?.recipe_name && (
-                              <p style={{ fontSize: '0.85rem', color: '#666', margin: '0', padding: '0 5px', fontStyle: 'italic' }}>
-                                Lleva: {r.ingredients?.join(', ') || 'Nada registrado'}
-                              </p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
+                                {(r.ingredients || []).map(ing => (
+                                  <span key={ing} style={{ backgroundColor: '#f3f4f6', color: '#666', padding: '4px 8px', borderRadius: '8px', fontSize: '0.75rem' }}>
+                                    {ing}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </>
                         ) : (
                           
-                          /* LOS INPUTS CLÁSICOS PARA RECETAS NUEVAS O MODIFICADAS */
-                          <>
+                          /* EDITOR AVANZADO DE RECETAS E INGREDIENTES */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <input 
+                              id={`name-${slotKey}`}
                               type="text" 
-                              placeholder="Nombre del plato"
+                              placeholder="Nombre del plato..."
                               autoFocus
                               defaultValue={r?.recipe_name || ''} 
-                              onBlur={(e) => saveRecipe(day, type, e.target.value, r?.ingredients?.join(', ') || '')}
-                              style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #5D5CDE', marginBottom: '8px', boxSizing: 'border-box' }}
+                              onBlur={(e) => saveRecipe(day, type, e.target.value, r?.ingredients || [])}
+                              style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #5D5CDE', boxSizing: 'border-box', fontWeight: 'bold' }}
                             />
-                            <input 
-                              type="text" 
-                              placeholder="Ingredientes (Ej: Pan, Huevos)"
-                              defaultValue={(r?.ingredients || []).join(', ')} 
-                              onBlur={(e) => saveRecipe(day, type, r?.recipe_name || '', e.target.value)}
-                              style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', color: '#666', boxSizing: 'border-box' }}
-                            />
+                            
+                            {/* Píldoras de ingredientes actuales */}
+                            {(r?.ingredients?.length > 0) && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {r.ingredients.map(ing => (
+                                  <span key={ing} style={{ background: '#e5e7eb', padding: '6px 10px', borderRadius: '10px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {ing}
+                                    <span onClick={() => {
+                                      const newIngs = r.ingredients.filter(i => i !== ing);
+                                      const currentName = document.getElementById(`name-${slotKey}`)?.value || 'Plato Nuevo';
+                                      saveRecipe(day, type, currentName, newIngs);
+                                    }} style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '1rem', lineHeight: '1' }}>×</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Selector para agregar desde el Inventario */}
+                            <select 
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if(!val) return;
+                                const currentName = document.getElementById(`name-${slotKey}`)?.value || 'Plato Nuevo';
+                                const newIngs = [...(r?.ingredients || []), val];
+                                saveRecipe(day, type, currentName, newIngs);
+                              }}
+                              style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '0.9rem' }}
+                            >
+                              <option value="">+ Sumar ingrediente de heladera...</option>
+                              {inventario.filter(i => !(r?.ingredients || []).includes(i.ingredient)).map(i => (
+                                <option key={i.id} value={i.ingredient}>{i.ingredient}</option>
+                              ))}
+                            </select>
+
+                            {/* Crear Ingrediente Rápido */}
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                              <input 
+                                id={`new-ing-${slotKey}`}
+                                type="text"
+                                placeholder="O crear uno nuevo..."
+                                style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                              />
+                              <button 
+                                onClick={async () => {
+                                  const input = document.getElementById(`new-ing-${slotKey}`);
+                                  const val = input.value.trim();
+                                  if(!val) return;
+                                  
+                                  const currentName = document.getElementById(`name-${slotKey}`)?.value || 'Plato Nuevo';
+                                  await supabase.from('pantry_inventory').insert([{ ingredient: val, in_stock: true }]);
+                                  const newIngs = [...(r?.ingredients || []), val];
+                                  await saveRecipe(day, type, currentName, newIngs);
+                                  input.value = '';
+                                }}
+                                style={{ padding: '0 15px', borderRadius: '12px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold' }}
+                              >
+                                Crear
+                              </button>
+                            </div>
+
                             <button 
                               onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: false})} 
-                              style={{ marginTop: '10px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '8px', background: '#eee', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                              style={{ marginTop: '5px', padding: '10px', borderRadius: '12px', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontWeight: '700', color: '#333' }}
                             >
-                              ✓ Listo
+                              ✓ Terminar Plato
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
                     );
