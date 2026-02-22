@@ -92,6 +92,53 @@ export default function Nutricion() {
     fetchData(); 
   };
 
+  // --- NUEVA LÓGICA: MULTI-PLATOS ---
+  const addDishToMeal = (day, type, currentRecipe, newDishName) => {
+    const found = uniqueRecipes.find(ur => ur.name === newDishName);
+    if (!found) return;
+
+    // Si ya hay platos, los separamos. Si no, array vacío.
+    const currentDishes = currentRecipe?.recipe_name ? currentRecipe.recipe_name.split(' + ') : [];
+    if (currentDishes.includes(newDishName)) return; // Evita que agregues "Café" dos veces
+
+    const newName = [...currentDishes, newDishName].join(' + ');
+    
+    // Combina los ingredientes del plato nuevo con los que ya estaban sin duplicar
+    const newIngs = Array.from(new Set([...(currentRecipe?.ingredients || []), ...found.ingredients]));
+
+    saveRecipe(day, type, newName, newIngs);
+  };
+
+  const removeDishFromMeal = (day, type, currentRecipe, dishToRemove) => {
+    const currentDishes = currentRecipe.recipe_name.split(' + ');
+    const newDishes = currentDishes.filter(d => d !== dishToRemove);
+
+    if (newDishes.length === 0) {
+      saveRecipe(day, type, '', []);
+      return;
+    }
+
+    const newName = newDishes.join(' + ');
+    const removedDishData = uniqueRecipes.find(ur => ur.name === dishToRemove);
+    let finalIngs = currentRecipe.ingredients || [];
+
+    // Lógica para restar ingredientes sin borrar los que comparten otros platos
+    if (removedDishData) {
+      const ingsToRemove = removedDishData.ingredients;
+      let requiredByOthers = [];
+      newDishes.forEach(dish => {
+        const found = uniqueRecipes.find(ur => ur.name === dish);
+        if (found) requiredByOthers = [...requiredByOthers, ...found.ingredients];
+      });
+
+      finalIngs = finalIngs.filter(ing =>
+        !ingsToRemove.includes(ing) || requiredByOthers.includes(ing)
+      );
+    }
+
+    saveRecipe(day, type, newName, Array.from(new Set(finalIngs)));
+  };
+
   // --- CRUD HELADERA (Stock) ---
   const toggleStock = async (id, currentStatus) => {
     setInventario(inventario.map(item => item.id === id ? { ...item, in_stock: !currentStatus } : item));
@@ -136,13 +183,12 @@ export default function Nutricion() {
   };
 
   const deleteGlobalRecipe = async (name) => {
-    if (window.confirm(`¿Borrar "${name}" de tu recetario general? (También se borrará de los días planificados)`)) {
+    if (window.confirm(`¿Borrar "${name}" de tu recetario general?`)) {
       await supabase.from('recipes').delete().eq('recipe_name', name);
       fetchData();
     }
   };
 
-  // --- ESTILOS REUTILIZABLES ---
   const moduleStyle = { backgroundColor: '#f9fafb', border: '1px solid #eee', borderRadius: '24px', padding: '1.5rem', marginBottom: '1.5rem' };
   const summaryStyle = { fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', outline: 'none', display: 'flex', alignItems: 'center', color: '#111' };
 
@@ -186,7 +232,7 @@ export default function Nutricion() {
         })}
       </div>
 
-      {/* SECCIÓN 2: MÓDULO HELADERA (Desplegable) */}
+      {/* SECCIÓN 2: MÓDULO HELADERA */}
       <details style={moduleStyle}>
         <summary style={summaryStyle}>🛒 Heladera y Stock</summary>
         <p style={{ color: '#666', marginTop: '10px', fontSize: '0.9rem' }}>Tocá la casilla para tildar el stock. Podés editar el nombre tocando el texto.</p>
@@ -222,11 +268,10 @@ export default function Nutricion() {
         </div>
       </details>
 
-      {/* SECCIÓN 3: MÓDULO RECETARIO Y PLAN (Desplegable) */}
+      {/* SECCIÓN 3: MÓDULO RECETARIO Y PLAN */}
       <details style={moduleStyle}>
         <summary style={summaryStyle}>🍲 Recetario y Plan</summary>
         
-        {/* Sub-sección: Plan Semanal */}
         <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📅 Plan Semanal</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {dias.map(day => (
@@ -244,45 +289,56 @@ export default function Nutricion() {
                     <div key={type} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '16px', border: '1px solid #eee' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: '#000' }}>{type}</label>
-                        {r && !isCustom && (
+                        {!isCustom && (
                           <button onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: true})} style={{ fontSize: '0.75rem', color: '#5D5CDE', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                            ✏️ Ajustar
+                            ✏️ Editar manual
                           </button>
                         )}
                       </div>
                       
                       {!isCustom ? (
                         <>
+                          {/* PLATOS SELECCIONADOS (PÍLDORAS NEGRAS) */}
+                          {r?.recipe_name && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                              {r.recipe_name.split(' + ').map(dish => (
+                                <span key={dish} style={{ backgroundColor: '#111', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                                  {dish}
+                                  <span onClick={() => removeDishFromMeal(day, type, r, dish)} style={{ cursor: 'pointer', color: '#ef4444', fontSize: '1.2rem', lineHeight: '1' }}>×</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
                           <select
-                            value={r?.recipe_name || ''}
+                            value=""
                             onChange={(e) => {
                               const val = e.target.value;
                               if (val === 'NEW') setShowCustomInput({...showCustomInput, [slotKey]: true});
-                              else if (val === '') saveRecipe(day, type, '', []); 
-                              else {
-                                const found = uniqueRecipes.find(ur => ur.name === val);
-                                if (found) saveRecipe(day, type, found.name, found.ingredients);
-                              }
+                              else if (val !== '') addDishToMeal(day, type, r, val);
                             }}
                             style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#fff', fontSize: '1rem', outline: 'none', marginBottom: r ? '8px' : '0' }}
                           >
-                            <option value="">-- Sin plan --</option>
+                            <option value="">+ Sumar comida / bebida...</option>
                             {uniqueRecipes.map(ur => <option key={ur.name} value={ur.name}>🍲 {ur.name}</option>)}
-                            <option value="NEW" style={{ fontWeight: 'bold', color: '#5D5CDE' }}>➕ Escribir otro plato...</option>
+                            <option value="NEW" style={{ fontWeight: 'bold', color: '#5D5CDE' }}>✏️ Editar a mano / Ingredientes...</option>
                           </select>
 
-                          {r?.recipe_name && (
+                          {/* INGREDIENTES RESULTANTES (PÍLDORAS GRISES) */}
+                          {r?.ingredients?.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-                              {(r.ingredients || []).map(ing => (
+                              {r.ingredients.map(ing => (
                                 <span key={ing} style={{ backgroundColor: '#e5e7eb', color: '#333', padding: '4px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '500' }}>{ing}</span>
                               ))}
                             </div>
                           )}
                         </>
                       ) : (
+                        
+                        /* EDITOR MANUAL (Para cosas 100% custom) */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <input 
-                            id={`name-${slotKey}`} type="text" placeholder="Nombre del plato..." autoFocus defaultValue={r?.recipe_name || ''} 
+                            id={`name-${slotKey}`} type="text" placeholder="Nombre completo del plato..." autoFocus defaultValue={r?.recipe_name || ''} 
                             onBlur={(e) => saveRecipe(day, type, e.target.value, r?.ingredients || [])}
                             style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #5D5CDE', boxSizing: 'border-box', fontWeight: 'bold' }}
                           />
@@ -316,7 +372,7 @@ export default function Nutricion() {
                             ))}
                           </select>
                           <div style={{ display: 'flex', gap: '5px' }}>
-                            <input id={`new-ing-${slotKey}`} type="text" placeholder="O crear uno nuevo..." style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                            <input id={`new-ing-${slotKey}`} type="text" placeholder="O crear ingrediente nuevo..." style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', boxSizing: 'border-box' }} />
                             <button 
                               onClick={async () => {
                                 const input = document.getElementById(`new-ing-${slotKey}`);
@@ -330,7 +386,7 @@ export default function Nutricion() {
                               style={{ padding: '0 15px', borderRadius: '12px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold' }}
                             >Crear</button>
                           </div>
-                          <button onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: false})} style={{ marginTop: '5px', padding: '10px', borderRadius: '12px', background: '#ddd', border: 'none', cursor: 'pointer', fontWeight: '700', color: '#333' }}>✓ Terminar Plato</button>
+                          <button onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: false})} style={{ marginTop: '5px', padding: '10px', borderRadius: '12px', background: '#ddd', border: 'none', cursor: 'pointer', fontWeight: '700', color: '#333' }}>✓ Terminar Manual</button>
                         </div>
                       )}
                     </div>
@@ -342,11 +398,11 @@ export default function Nutricion() {
         </div>
 
         {/* Sub-sección: Base de Datos de Recetas */}
-        <h3 style={{ marginTop: '3rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📖 Todas mis Recetas</h3>
-        <p style={{ color: '#666', marginBottom: '1rem', fontSize: '0.9rem' }}>Los cambios acá afectan a tu plan semanal. Los ingredientes separalos por coma.</p>
+        <h3 style={{ marginTop: '3rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📖 Todas mis Recetas Base</h3>
+        <p style={{ color: '#666', marginBottom: '1rem', fontSize: '0.9rem' }}>Modificar estos platos base cambiará sus ingredientes cuando los elijas en el plan.</p>
         
         <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-          <input id="new-global-recipe" type="text" placeholder="Crear receta nueva..." style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none' }} />
+          <input id="new-global-recipe" type="text" placeholder="Crear receta suelta..." style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none' }} />
           <button 
             onClick={() => {
               const input = document.getElementById('new-global-recipe');
