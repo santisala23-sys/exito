@@ -97,13 +97,10 @@ export default function Nutricion() {
     const found = uniqueRecipes.find(ur => ur.name === newDishName);
     if (!found) return;
 
-    // Si ya hay platos, los separamos. Si no, array vacío.
     const currentDishes = currentRecipe?.recipe_name ? currentRecipe.recipe_name.split(' + ') : [];
-    if (currentDishes.includes(newDishName)) return; // Evita que agregues "Café" dos veces
+    if (currentDishes.includes(newDishName)) return; 
 
     const newName = [...currentDishes, newDishName].join(' + ');
-    
-    // Combina los ingredientes del plato nuevo con los que ya estaban sin duplicar
     const newIngs = Array.from(new Set([...(currentRecipe?.ingredients || []), ...found.ingredients]));
 
     saveRecipe(day, type, newName, newIngs);
@@ -122,7 +119,6 @@ export default function Nutricion() {
     const removedDishData = uniqueRecipes.find(ur => ur.name === dishToRemove);
     let finalIngs = currentRecipe.ingredients || [];
 
-    // Lógica para restar ingredientes sin borrar los que comparten otros platos
     if (removedDishData) {
       const ingsToRemove = removedDishData.ingredients;
       let requiredByOthers = [];
@@ -193,7 +189,7 @@ export default function Nutricion() {
   const summaryStyle = { fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', outline: 'none', display: 'flex', alignItems: 'center', color: '#111' };
 
   return (
-    <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh' }}>
+    <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh', boxSizing: 'border-box' }}>
       
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <Link href="/" style={{ textDecoration: 'none', color: '#999', fontWeight: '600' }}>← Volver</Link>
@@ -243,24 +239,24 @@ export default function Nutricion() {
             placeholder="Agregar nuevo ingrediente..." 
             value={newIngredient}
             onChange={(e) => setNewIngredient(e.target.value)}
-            style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none' }}
+            style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none', minWidth: 0, boxSizing: 'border-box' }}
           />
-          <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold' }}>+</button>
+          <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold', flexShrink: 0 }}>+</button>
         </form>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {inventario.map(item => (
-            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: item.in_stock ? '#f0fdf4' : '#fff', border: `1px solid ${item.in_stock ? '#bbf7d0' : '#eee'}`, borderRadius: '16px' }}>
-              <button onClick={() => toggleStock(item.id, item.in_stock)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: 0 }}>
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: item.in_stock ? '#f0fdf4' : '#fff', border: `1px solid ${item.in_stock ? '#bbf7d0' : '#eee'}`, borderRadius: '16px', boxSizing: 'border-box' }}>
+              <button onClick={() => toggleStock(item.id, item.in_stock)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
                 {item.in_stock ? '✅' : '⬜'}
               </button>
               <input 
                 type="text" 
                 defaultValue={item.ingredient} 
                 onBlur={(e) => updateIngredientName(item.id, e.target.value)} 
-                style={{ flex: 1, border: 'none', background: 'transparent', fontWeight: '600', color: item.in_stock ? '#166534' : '#333', outline: 'none', fontSize: '1rem', width: '100%' }} 
+                style={{ flex: 1, border: 'none', background: 'transparent', fontWeight: '600', color: item.in_stock ? '#166534' : '#333', outline: 'none', fontSize: '1rem', width: '100%', minWidth: 0 }} 
               />
-              <button onClick={() => deleteIngredient(item.id)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '10px', padding: '8px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+              <button onClick={() => deleteIngredient(item.id)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '10px', padding: '8px 12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>
                 🗑️
               </button>
             </div>
@@ -275,7 +271,7 @@ export default function Nutricion() {
         <h3 style={{ marginTop: '2rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📅 Plan Semanal</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {dias.map(day => (
-            <details key={day} style={{ backgroundColor: '#fff', border: '1px solid #eee', borderRadius: '20px', padding: '1.5rem' }}>
+            <details key={day} style={{ backgroundColor: '#fff', border: '1px solid #eee', borderRadius: '20px', padding: '1.5rem', boxSizing: 'border-box' }}>
               <summary style={{ fontWeight: '800', fontSize: '1.1rem', cursor: 'pointer', outline: 'none' }}>
                 {day} {day === diaHoy && '📍'}
               </summary>
@@ -286,7 +282,7 @@ export default function Nutricion() {
                   const isCustom = showCustomInput[slotKey];
 
                   return (
-                    <div key={type} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '16px', border: '1px solid #eee' }}>
+                    <div key={type} style={{ padding: '1rem', backgroundColor: '#f9fafb', borderRadius: '16px', border: '1px solid #eee', boxSizing: 'border-box' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', color: '#000' }}>{type}</label>
                         {!isCustom && (
@@ -298,7 +294,6 @@ export default function Nutricion() {
                       
                       {!isCustom ? (
                         <>
-                          {/* PLATOS SELECCIONADOS (PÍLDORAS NEGRAS) */}
                           {r?.recipe_name && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
                               {r.recipe_name.split(' + ').map(dish => (
@@ -317,14 +312,13 @@ export default function Nutricion() {
                               if (val === 'NEW') setShowCustomInput({...showCustomInput, [slotKey]: true});
                               else if (val !== '') addDishToMeal(day, type, r, val);
                             }}
-                            style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#fff', fontSize: '1rem', outline: 'none', marginBottom: r ? '8px' : '0' }}
+                            style={{ width: '100%', padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#fff', fontSize: '1rem', outline: 'none', marginBottom: r ? '8px' : '0', boxSizing: 'border-box' }}
                           >
                             <option value="">+ Sumar comida / bebida...</option>
                             {uniqueRecipes.map(ur => <option key={ur.name} value={ur.name}>🍲 {ur.name}</option>)}
                             <option value="NEW" style={{ fontWeight: 'bold', color: '#5D5CDE' }}>✏️ Editar a mano / Ingredientes...</option>
                           </select>
 
-                          {/* INGREDIENTES RESULTANTES (PÍLDORAS GRISES) */}
                           {r?.ingredients?.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
                               {r.ingredients.map(ing => (
@@ -334,8 +328,6 @@ export default function Nutricion() {
                           )}
                         </>
                       ) : (
-                        
-                        /* EDITOR MANUAL (Para cosas 100% custom) */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <input 
                             id={`name-${slotKey}`} type="text" placeholder="Nombre completo del plato..." autoFocus defaultValue={r?.recipe_name || ''} 
@@ -372,7 +364,7 @@ export default function Nutricion() {
                             ))}
                           </select>
                           <div style={{ display: 'flex', gap: '5px' }}>
-                            <input id={`new-ing-${slotKey}`} type="text" placeholder="O crear ingrediente nuevo..." style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                            <input id={`new-ing-${slotKey}`} type="text" placeholder="O crear ingrediente nuevo..." style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #ddd', fontSize: '0.9rem', boxSizing: 'border-box', minWidth: 0 }} />
                             <button 
                               onClick={async () => {
                                 const input = document.getElementById(`new-ing-${slotKey}`);
@@ -383,7 +375,7 @@ export default function Nutricion() {
                                 await saveRecipe(day, type, currentName, [...(r?.ingredients || []), val]);
                                 input.value = '';
                               }}
-                              style={{ padding: '0 15px', borderRadius: '12px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold' }}
+                              style={{ padding: '0 15px', borderRadius: '12px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold', flexShrink: 0 }}
                             >Crear</button>
                           </div>
                           <button onClick={() => setShowCustomInput({...showCustomInput, [slotKey]: false})} style={{ marginTop: '5px', padding: '10px', borderRadius: '12px', background: '#ddd', border: 'none', cursor: 'pointer', fontWeight: '700', color: '#333' }}>✓ Terminar Manual</button>
@@ -397,37 +389,39 @@ export default function Nutricion() {
           ))}
         </div>
 
-        {/* Sub-sección: Base de Datos de Recetas */}
+        {/* Sub-sección: Base de Datos de Recetas (Corregido) */}
         <h3 style={{ marginTop: '3rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📖 Todas mis Recetas Base</h3>
         <p style={{ color: '#666', marginBottom: '1rem', fontSize: '0.9rem' }}>Modificar estos platos base cambiará sus ingredientes cuando los elijas en el plan.</p>
         
         <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-          <input id="new-global-recipe" type="text" placeholder="Crear receta suelta..." style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none' }} />
+          <input id="new-global-recipe" type="text" placeholder="Crear receta suelta..." style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none', minWidth: 0, boxSizing: 'border-box' }} />
           <button 
             onClick={() => {
               const input = document.getElementById('new-global-recipe');
               createTemplateRecipe(input.value);
               input.value = '';
             }} 
-            style={{ padding: '0 1.5rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold' }}
+            style={{ padding: '0 1.5rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold', flexShrink: 0 }}
           >+ Crear</button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {uniqueRecipes.map(ur => (
-            <div key={ur.name} style={{ background: '#fff', padding: '1.2rem', borderRadius: '16px', border: '1px solid #eee' }}>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+            <div key={ur.name} style={{ background: '#fff', padding: '1.2rem', borderRadius: '16px', border: '1px solid #eee', boxSizing: 'border-box' }}>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', width: '100%' }}>
                 <input 
                   type="text" 
                   defaultValue={ur.name} 
                   onBlur={(e) => updateGlobalRecipe(ur.name, e.target.value, ur.ingredients.join(', '))} 
-                  style={{ flex: 1, fontWeight: '800', fontSize: '1.1rem', border: '1px solid #ddd', borderRadius: '10px', padding: '10px', outline: 'none' }} 
+                  style={{ flex: 1, fontWeight: '800', fontSize: '1.1rem', border: '1px solid #ddd', borderRadius: '10px', padding: '10px', outline: 'none', minWidth: 0, boxSizing: 'border-box' }} 
                 />
                 <button 
                   onClick={() => deleteGlobalRecipe(ur.name)} 
-                  style={{ background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '10px', padding: '10px 14px', fontWeight: 'bold' }}
+                  style={{ background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '10px', padding: '10px 14px', fontWeight: 'bold', flexShrink: 0 }}
                 >🗑️</button>
               </div>
+
               <input 
                 type="text" 
                 placeholder="Ingredientes (ej: Pan, Queso)" 
@@ -435,6 +429,7 @@ export default function Nutricion() {
                 onBlur={(e) => updateGlobalRecipe(ur.name, ur.name, e.target.value)} 
                 style={{ width: '100%', fontSize: '0.9rem', border: '1px solid #ddd', borderRadius: '10px', padding: '10px', color: '#666', outline: 'none', boxSizing: 'border-box' }} 
               />
+
             </div>
           ))}
         </div>
