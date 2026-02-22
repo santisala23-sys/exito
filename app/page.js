@@ -119,8 +119,8 @@ export default function Home() {
         <Link href="/otros" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#374151', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>✨ Otros</span>
-              <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Hábitos diarios</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>✨ Diarios</span>
+              <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Hábitos</span>
             </div>
             <span style={{ fontSize: '1.5rem', fontWeight: '900', backgroundColor: 'rgba(255,255,255,0.2)', padding: '10px 20px', borderRadius: '18px' }}>
               {pendientes.otros}
