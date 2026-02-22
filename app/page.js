@@ -168,7 +168,18 @@ export default function Home() {
             </span>
           </button>
         </Link>
-
+        
+        <Link href="/finanzas" style={{ textDecoration: 'none' }}>
+          <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>💸 Finanzas</span>
+              <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Billetera y gastos</span>
+            </div>
+            <span style={{ fontSize: '1.5rem', fontWeight: '900', backgroundColor: 'rgba(0,0,0,0.15)', padding: '10px 20px', borderRadius: '18px' }}>
+              Ir
+            </span>
+          </button>
+        </Link>
         <Link href="/nutricion" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#f3f4f6', color: '#000', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
