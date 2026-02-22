@@ -192,7 +192,7 @@ export default function Home() {
 
       </div>
 
-      {/* --- NUEVO MÓDULO: ACCESOS RÁPIDOS --- */}
+      {/* --- MÓDULO: ACCESOS RÁPIDOS --- */}
       <div style={{ marginTop: '3rem', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
         <h3 style={{ fontSize: '1rem', color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem', textAlign: 'center' }}>Accesos Rápidos</h3>
         
@@ -232,15 +232,15 @@ export default function Home() {
             <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>
               Última ubicación: <strong style={{ color: '#111' }}>{parkingLoc}</strong>
             </p>
-            <form onSubmit={saveParking} style={{ display: 'flex', gap: '10px' }}>
+            <form onSubmit={saveParking} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <input 
                 type="text" 
                 placeholder="Ej: Av. Cabildo 2040" 
                 value={parkingInput}
                 onChange={(e) => setParkingInput(e.target.value)}
-                style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', outline: 'none' }}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' }}
               />
-              <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>
+              <button type="submit" style={{ width: '100%', padding: '1rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem' }}>
                 {parkingStatus || 'Guardar'}
               </button>
             </form>
