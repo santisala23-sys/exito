@@ -9,9 +9,7 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    
     if (pin === process.env.NEXT_PUBLIC_APP_PIN) {
-      // Seteamos una "cookie" de autorización que dura 30 días
       document.cookie = "exito_auth=true; path=/; max-age=" + 60 * 60 * 24 * 30;
       router.push('/');
     } else {
@@ -21,25 +19,69 @@ export default function Login() {
   };
 
   return (
-    <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb', padding: '2rem', fontFamily: 'sans-serif' }}>
-      <form onSubmit={handleLogin} style={{ backgroundColor: '#fff', padding: '2.5rem 2rem', borderRadius: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '900', marginBottom: '0.5rem', letterSpacing: '-0.05em' }}>Éxito</h1>
-        <p style={{ color: '#666', marginBottom: '2.5rem', fontSize: '0.9rem' }}>Ingresá tu PIN para acceder</p>
+    <main style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      minHeight: '100dvh', // Usamos dvh para que en el celu ignore las barras del navegador
+      backgroundColor: '#f9fafb', 
+      padding: '1rem', 
+      fontFamily: '-apple-system, system-ui, sans-serif' 
+    }}>
+      <form onSubmit={handleLogin} style={{ 
+        backgroundColor: '#fff', 
+        padding: '2.5rem 1.5rem', 
+        borderRadius: '32px', 
+        boxShadow: '0 10px 40px rgba(0,0,0,0.05)', 
+        width: '100%', 
+        maxWidth: '350px', // Un poco más angosto para que no toque los bordes
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center'
+      }}>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: '900', marginBottom: '0.5rem', letterSpacing: '-0.05em' }}>Éxito</h1>
+        <p style={{ color: '#666', marginBottom: '2rem', fontSize: '0.95rem' }}>Ingresá tu PIN</p>
         
         <input 
           type="password" 
-          inputMode="numeric"
+          inputMode="numeric" // Mantiene el teclado numérico
+          pattern="[0-9]*"    // Ayuda a algunos navegadores a entender que es solo números
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           placeholder="••••"
-          style={{ width: '100%', padding: '1.2rem', fontSize: '2rem', textAlign: 'center', borderRadius: '20px', border: '2px solid #eee', marginBottom: '1rem', letterSpacing: '0.3em', outline: 'none' }}
+          autoFocus
+          style={{ 
+            width: '100%', 
+            padding: '1rem', 
+            fontSize: '2.5rem', 
+            textAlign: 'center', 
+            borderRadius: '20px', 
+            border: '2px solid #f3f4f6', 
+            marginBottom: '1rem', 
+            letterSpacing: '0.2em', 
+            outline: 'none',
+            backgroundColor: '#f9fafb',
+            boxSizing: 'border-box'
+          }}
         />
         
         <div style={{ minHeight: '24px', marginBottom: '1rem' }}>
-          {error && <p style={{ color: '#ef4444', fontSize: '0.9rem', margin: 0, fontWeight: '600' }}>{error}</p>}
+          {error && <p style={{ color: '#ef4444', fontSize: '0.9rem', fontWeight: '600' }}>{error}</p>}
         </div>
 
-        <button type="submit" style={{ width: '100%', padding: '1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '20px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer' }}>
+        <button type="submit" style={{ 
+          width: '100%', 
+          padding: '1.2rem', 
+          backgroundColor: '#000', 
+          color: '#fff', 
+          border: 'none', 
+          borderRadius: '20px', 
+          fontSize: '1.1rem', 
+          fontWeight: 'bold', 
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+        }}>
           Entrar
         </button>
       </form>
