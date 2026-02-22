@@ -11,6 +11,7 @@ export default function Nutricion() {
   const [registroComidas, setRegistroComidas] = useState({});
   const [newIngredient, setNewIngredient] = useState('');
   const [showCustomInput, setShowCustomInput] = useState({}); 
+  const [copied, setCopied] = useState(false); 
 
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const tipos = ['Desayuno', 'Almuerzo', 'Merienda', 'Cena'];
@@ -51,17 +52,25 @@ export default function Nutricion() {
 
   // --- COMIDAS DIARIAS ---
   const registrarComida = async (tipo, plato) => {
-    const today = getToday();
-    const isCompleted = !registroComidas[tipo];
+    // 1. Pedimos confirmación
+    const confirmar = window.confirm(`¿Ya terminaste tu ${tipo} ("${plato}")?`);
     
-    setRegistroComidas({ ...registroComidas, [tipo]: isCompleted });
+    if (confirmar) {
+      const today = getToday();
+      
+      // 2. Guardamos en Supabase
+      const { error } = await supabase.from('meal_plan').upsert({
+        date: today,
+        meal_type: tipo,
+        planned_meal: plato,
+        completed: true
+      }, { onConflict: 'date, meal_type' });
 
-    await supabase.from('meal_plan').upsert({
-      date: today,
-      meal_type: tipo,
-      planned_meal: plato,
-      completed: isCompleted
-    }, { onConflict: 'date, meal_type' });
+      // 3. Actualizamos el estado para que desaparezca
+      if (!error) {
+        setRegistroComidas({ ...registroComidas, [tipo]: true });
+      }
+    }
   };
 
   const checkIngredientes = (necesarios) => {
@@ -92,7 +101,6 @@ export default function Nutricion() {
     fetchData(); 
   };
 
-  // --- NUEVA LÓGICA: MULTI-PLATOS ---
   const addDishToMeal = (day, type, currentRecipe, newDishName) => {
     const found = uniqueRecipes.find(ur => ur.name === newDishName);
     if (!found) return;
@@ -158,13 +166,22 @@ export default function Nutricion() {
   };
 
   const deleteIngredient = async (id) => {
-    if (window.confirm('¿Eliminar ingrediente definitivamente?')) {
+    if (window.confirm('¿Eliminar producto definitivamente?')) {
       await supabase.from('pantry_inventory').delete().eq('id', id);
       setInventario(inventario.filter(i => i.id !== id));
     }
   };
 
-  // --- CRUD RECETARIO GLOBAL ---
+  const copyShoppingList = () => {
+    const missingItems = inventario.filter(i => !i.in_stock).map(i => `- ${i.ingredient}`).join('\n');
+    const textToCopy = `🛒 *Lista de Compras:*\n${missingItems}`;
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   const createTemplateRecipe = async (name) => {
     if(!name.trim()) return;
     await supabase.from('recipes').insert([{ day_of_week: 'TEMPLATE', meal_type: 'TEMPLATE', recipe_name: name.trim(), ingredients: [] }]);
@@ -188,6 +205,11 @@ export default function Nutricion() {
   const moduleStyle = { backgroundColor: '#f9fafb', border: '1px solid #eee', borderRadius: '24px', padding: '1.5rem', marginBottom: '1.5rem' };
   const summaryStyle = { fontWeight: '900', fontSize: '1.4rem', cursor: 'pointer', outline: 'none', display: 'flex', alignItems: 'center', color: '#111' };
 
+  const faltantes = inventario.filter(i => !i.in_stock);
+  
+  // Filtramos los tipos de comida para que solo se vean los que NO están marcados como completados hoy
+  const pendingMeals = tipos.filter(tipo => !registroComidas[tipo]);
+
   return (
     <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh', boxSizing: 'border-box' }}>
       
@@ -198,45 +220,68 @@ export default function Nutricion() {
       {/* SECCIÓN 1: HOY */}
       <h1 style={{ fontSize: '2.5rem', fontWeight: '900', margin: '0 0 2rem 0', letterSpacing: '-0.05em' }}>Hoy: {diaHoy}</h1>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '3rem' }}>
-        {tipos.map(tipo => {
-          const r = getRecipe(diaHoy, tipo);
-          const plato = r ? r.recipe_name : 'No hay menú asignado';
-          const ingredientes = r?.ingredients || [];
-          const tengoTodo = checkIngredientes(ingredientes);
-          
-          return (
-            <div key={tipo} style={{ padding: '1.5rem', borderRadius: '24px', border: '1px solid #f3f4f6', backgroundColor: registroComidas[tipo] ? '#f0fdf4' : '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', color: '#999' }}>{tipo}</span>
-                {r && (
-                  <span style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '10px', backgroundColor: tengoTodo ? '#dcfce7' : '#fee2e2', color: tengoTodo ? '#166534' : '#991b1b', fontWeight: '600' }}>
-                    {tengoTodo ? '✅ Stock OK' : '❌ Falta comprar'}
-                  </span>
-                )}
+        
+        {pendingMeals.length === 0 ? (
+           <div style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f0fdf4', borderRadius: '24px', border: '1px solid #dcfce7' }}>
+             <span style={{ fontSize: '3rem' }}>🍽️</span>
+             <p style={{ color: '#166534', marginTop: '1rem', fontWeight: 'bold' }}>¡Todas las comidas listas!</p>
+           </div>
+        ) : (
+          pendingMeals.map(tipo => {
+            const r = getRecipe(diaHoy, tipo);
+            const plato = r ? r.recipe_name : 'No hay menú asignado';
+            const ingredientes = r?.ingredients || [];
+            const tengoTodo = checkIngredientes(ingredientes);
+            
+            return (
+              <div key={tipo} style={{ padding: '1.5rem', borderRadius: '24px', border: '1px solid #f3f4f6', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', color: '#999' }}>{tipo}</span>
+                  {r && (
+                    <span style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '10px', backgroundColor: tengoTodo ? '#dcfce7' : '#fee2e2', color: tengoTodo ? '#166534' : '#991b1b', fontWeight: '600' }}>
+                      {tengoTodo ? '✅ Stock OK' : '❌ Falta comprar'}
+                    </span>
+                  )}
+                </div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', color: '#111' }}>{plato}</h3>
+                {r && <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 15px 0' }}>{ingredientes.join(', ')}</p>}
+                <button 
+                  onClick={() => registrarComida(tipo, plato)}
+                  disabled={!r}
+                  style={{ width: '100%', padding: '1rem', borderRadius: '16px', border: 'none', backgroundColor: r ? '#000' : '#e5e7eb', color: r ? '#fff' : '#999', fontWeight: '700', cursor: r ? 'pointer' : 'not-allowed' }}
+                >
+                  {r ? 'Marcar como hecho' : 'Sin plan'}
+                </button>
               </div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.3rem', color: '#111' }}>{plato}</h3>
-              {r && <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 15px 0' }}>{ingredientes.join(', ')}</p>}
-              <button 
-                onClick={() => registrarComida(tipo, plato)}
-                disabled={!r}
-                style={{ width: '100%', padding: '1rem', borderRadius: '16px', border: 'none', backgroundColor: registroComidas[tipo] ? '#166534' : (r ? '#000' : '#e5e7eb'), color: r ? '#fff' : '#999', fontWeight: '700', cursor: r ? 'pointer' : 'not-allowed' }}
-              >
-                {registroComidas[tipo] ? 'Completado ✅' : (r ? 'Marcar como hecho' : 'Sin plan')}
-              </button>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
-      {/* SECCIÓN 2: MÓDULO HELADERA */}
+      {/* SECCIÓN 2: MÓDULO HELADERA / INVENTARIO */}
       <details style={moduleStyle}>
-        <summary style={summaryStyle}>🛒 Heladera y Stock</summary>
+        <summary style={summaryStyle}>🛒 Inventario / Faltantes</summary>
         <p style={{ color: '#666', marginTop: '10px', fontSize: '0.9rem' }}>Tocá la casilla para tildar el stock. Podés editar el nombre tocando el texto.</p>
+        
+        {faltantes.length > 0 && (
+          <div style={{ backgroundColor: '#fee2e2', padding: '1rem', borderRadius: '16px', marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #fca5a5' }}>
+            <div>
+              <span style={{ display: 'block', color: '#991b1b', fontWeight: '900', fontSize: '1.1rem' }}>Faltan {faltantes.length} cosas</span>
+              <span style={{ fontSize: '0.8rem', color: '#b91c1c' }}>Copiá la lista para WhatsApp</span>
+            </div>
+            <button 
+              onClick={copyShoppingList}
+              style={{ padding: '10px 15px', backgroundColor: copied ? '#166534' : '#991b1b', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'background-color 0.2s' }}
+            >
+              {copied ? '¡Copiado! ✅' : '📋 Copiar'}
+            </button>
+          </div>
+        )}
         
         <form onSubmit={addPantryItem} style={{ display: 'flex', gap: '10px', margin: '1.5rem 0' }}>
           <input 
             type="text" 
-            placeholder="Agregar nuevo ingrediente..." 
+            placeholder="Agregar producto/ingrediente..." 
             value={newIngredient}
             onChange={(e) => setNewIngredient(e.target.value)}
             style={{ flex: 1, padding: '1rem', borderRadius: '16px', border: '1px solid #ddd', outline: 'none', minWidth: 0, boxSizing: 'border-box' }}
@@ -389,7 +434,7 @@ export default function Nutricion() {
           ))}
         </div>
 
-        {/* Sub-sección: Base de Datos de Recetas (Corregido) */}
+        {/* Sub-sección: Base de Datos de Recetas */}
         <h3 style={{ marginTop: '3rem', marginBottom: '1rem', fontSize: '1.2rem', fontWeight: '800' }}>📖 Todas mis Recetas Base</h3>
         <p style={{ color: '#666', marginBottom: '1rem', fontSize: '0.9rem' }}>Modificar estos platos base cambiará sus ingredientes cuando los elijas en el plan.</p>
         
