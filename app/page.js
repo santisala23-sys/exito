@@ -13,8 +13,15 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(true);
 
+  // --- ESTADOS PARA ACCESOS RÁPIDOS ---
+  const [cigStatus, setCigStatus] = useState(''); 
+  const [showParking, setShowParking] = useState(false);
+  const [parkingLoc, setParkingLoc] = useState('');
+  const [parkingInput, setParkingInput] = useState('');
+  const [parkingStatus, setParkingStatus] = useState('');
+
   useEffect(() => {
-    async function calcularPendientes() {
+    async function initData() {
       const today = getToday();
 
       // 1. Tasks Pendientes (Solo de hoy, atrasadas o sin fecha)
@@ -59,13 +66,57 @@ export default function Home() {
         entrenamiento: entrenamientoCount,
         nutricion: nutricionCount
       });
+
+      // 5. Cargar última ubicación del auto
+      const { data: parkData } = await supabase.from('parking').select('location').eq('id', 1).single();
+      if (parkData) {
+        setParkingLoc(parkData.location);
+        setParkingInput(parkData.location === 'No registrado' ? '' : parkData.location);
+      }
+
       setLoading(false);
     }
 
-    calcularPendientes();
+    initData();
   }, []);
 
   const totalPendientes = pendientes.tasks + pendientes.otros + pendientes.entrenamiento + pendientes.nutricion;
+
+  // --- FUNCIONES DE ACCESOS RÁPIDOS ---
+  const logCigarette = async () => {
+    setCigStatus('⏳');
+    const { error } = await supabase.from('cigarettes_log').insert([{}]); 
+    if (!error) {
+      setCigStatus('✅ Registrado');
+      setTimeout(() => setCigStatus(''), 2000); 
+    } else {
+      setCigStatus('❌ Error');
+      setTimeout(() => setCigStatus(''), 2000);
+    }
+  };
+
+  const toggleParking = () => {
+    setShowParking(!showParking);
+    setParkingStatus('');
+  };
+
+  const saveParking = async (e) => {
+    e.preventDefault();
+    setParkingStatus('⏳');
+    const newLocation = parkingInput.trim() || 'No registrado';
+    const { error } = await supabase.from('parking').upsert({ id: 1, location: newLocation, updated_at: new Date() });
+    
+    if (!error) {
+      setParkingLoc(newLocation);
+      setParkingStatus('✅ Guardado');
+      setTimeout(() => {
+        setParkingStatus('');
+        setShowParking(false); 
+      }, 1500);
+    } else {
+      setParkingStatus('❌ Error');
+    }
+  };
 
   return (
     <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh', color: '#111' }}>
@@ -79,7 +130,7 @@ export default function Home() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
         
-        {/* TASKS - VIOLETA */}
+        {/* TASKS */}
         <Link href="/tasks" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -92,7 +143,7 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* ENTRENAMIENTO - NEGRO */}
+        {/* ENTRENAMIENTO */}
         <Link href="/entrenamiento" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -105,7 +156,7 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* NUTRICION - GRIS CLARO */}
+        {/* NUTRICION */}
         <Link href="/nutricion" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#f3f4f6', color: '#000', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -118,7 +169,7 @@ export default function Home() {
           </button>
         </Link>
 
-        {/* OTROS - GRIS OSCURO */}
+        {/* OTROS */}
         <Link href="/otros" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#374151', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -141,9 +192,66 @@ export default function Home() {
 
       </div>
 
-      <footer style={{ marginTop: '4rem', textAlign: 'center', opacity: 0.3, fontSize: '0.8rem' }}>
+      {/* --- NUEVO MÓDULO: ACCESOS RÁPIDOS --- */}
+      <div style={{ marginTop: '3rem', borderTop: '1px solid #eee', paddingTop: '1.5rem' }}>
+        <h3 style={{ fontSize: '1rem', color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem', textAlign: 'center' }}>Accesos Rápidos</h3>
+        
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+          
+          {/* BOTÓN CIGARRO */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <button 
+              onClick={logCigarette}
+              style={{ width: '65px', height: '65px', borderRadius: '20px', border: '1px solid #eee', backgroundColor: '#f9fafb', fontSize: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}
+            >
+              🚬
+            </button>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: cigStatus.includes('✅') ? '#166534' : '#666', height: '15px' }}>
+              {cigStatus || 'Fumar'}
+            </span>
+          </div>
+
+          {/* BOTÓN ESTACIONAMIENTO */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <button 
+              onClick={toggleParking}
+              style={{ width: '65px', height: '65px', borderRadius: '20px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontSize: '1.8rem', fontWeight: '900', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(37,99,235,0.3)' }}
+            >
+              E
+            </button>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#666', height: '15px' }}>
+              Auto
+            </span>
+          </div>
+
+        </div>
+
+        {/* CAJÓN DESPLEGABLE DE ESTACIONAMIENTO */}
+        {showParking && (
+          <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>
+              Última ubicación: <strong style={{ color: '#111' }}>{parkingLoc}</strong>
+            </p>
+            <form onSubmit={saveParking} style={{ display: 'flex', gap: '10px' }}>
+              <input 
+                type="text" 
+                placeholder="Ej: Av. Cabildo 2040" 
+                value={parkingInput}
+                onChange={(e) => setParkingInput(e.target.value)}
+                style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', outline: 'none' }}
+              />
+              <button type="submit" style={{ padding: '0 1.5rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>
+                {parkingStatus || 'Guardar'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      <footer style={{ marginTop: '3rem', textAlign: 'center', opacity: 0.3, fontSize: '0.8rem' }}>
         ÉXITO APP • 2026
       </footer>
+
     </main>
   );
 }
