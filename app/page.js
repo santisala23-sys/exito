@@ -23,8 +23,12 @@ export default function Home() {
 
   // --- ESTADOS PARA CARGA RÁPIDA DE FINANZAS ---
   const [quickFinanceType, setQuickFinanceType] = useState(null); // 'ingreso' o 'egreso'
-  const [quickFinanceForm, setQuickFinanceForm] = useState({ amount: '', category: '' });
+  const [quickFinanceForm, setQuickFinanceForm] = useState({ amount: '', category: '', description: '' });
   const [quickFinanceStatus, setQuickFinanceStatus] = useState('');
+
+  // Categorías de Finanzas para el dropdown
+  const categoriasEgreso = ['Supermercado', 'Comida / Delivery', 'Transporte', 'Servicios / Suscripciones', 'Salidas', 'Proyectos', 'Salud', 'Otros'];
+  const categoriasIngreso = ['Honorarios Terapia', 'Sueldo / Agencia', 'Proyectos Musicales', 'Ventas', 'Otros'];
 
   useEffect(() => {
     async function initData() {
@@ -137,8 +141,9 @@ export default function Home() {
 
   // --- FUNCIONES DE CARGA RÁPIDA FINANZAS ---
   const handleQuickFinanceClick = (e, type) => {
-    e.preventDefault(); // Evita que el click abra la página /finanzas
-    setQuickFinanceType(quickFinanceType === type ? null : type); // Toggle del formulario
+    e.preventDefault(); 
+    setQuickFinanceType(quickFinanceType === type ? null : type);
+    setQuickFinanceForm({ amount: '', category: '', description: '' });
     setQuickFinanceStatus('');
   };
 
@@ -151,15 +156,15 @@ export default function Home() {
       transaction_type: quickFinanceType,
       amount: parseFloat(quickFinanceForm.amount),
       category: quickFinanceForm.category,
-      description: 'Carga rápida',
+      description: quickFinanceForm.description.trim() || 'Sin detalle',
       date: getToday()
     }]);
 
     if (!error) {
-      setQuickFinanceStatus('✅');
+      setQuickFinanceStatus('✅ Guardado');
       setTimeout(() => {
         setQuickFinanceType(null);
-        setQuickFinanceForm({ amount: '', category: '' });
+        setQuickFinanceForm({ amount: '', category: '', description: '' });
         setQuickFinanceStatus('');
       }, 1500);
     } else {
@@ -211,34 +216,60 @@ export default function Home() {
                 <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Billetera y gastos</span>
               </div>
               
-              {/* BOTONES DE CARGA RÁPIDA (Dentro de la tarjeta pero detienen la navegación al hacer clic) */}
+              {/* BOTONES DE CARGA RÁPIDA */}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div onClick={(e) => handleQuickFinanceClick(e, 'egreso')} style={{ width: '40px', height: '40px', backgroundColor: 'rgba(255,0,0,0.8)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>-</div>
-                <div onClick={(e) => handleQuickFinanceClick(e, 'ingreso')} style={{ width: '40px', height: '40px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>+</div>
+                <div onClick={(e) => handleQuickFinanceClick(e, 'egreso')} style={{ width: '45px', height: '45px', backgroundColor: 'rgba(255,0,0,0.8)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>-</div>
+                <div onClick={(e) => handleQuickFinanceClick(e, 'ingreso')} style={{ width: '45px', height: '45px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>+</div>
               </div>
             </button>
           </Link>
 
-          {/* FORMULARIO DESPLEGABLE RÁPIDO */}
+          {/* FORMULARIO DESPLEGABLE RÁPIDO (DISEÑO VERTICAL Y FULL) */}
           {quickFinanceType && (
-            <div style={{ padding: '0 1.8rem 1.8rem 1.8rem', backgroundColor: '#10b981' }}>
-              <form onSubmit={saveQuickFinance} style={{ display: 'flex', gap: '10px', backgroundColor: '#fff', padding: '10px', borderRadius: '16px' }}>
+            <div style={{ padding: '0 1.5rem 1.5rem 1.5rem', backgroundColor: '#10b981', animation: 'fadeIn 0.2s ease-out' }}>
+              <form onSubmit={saveQuickFinance} style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#fff', padding: '1.2rem', borderRadius: '20px' }}>
+                
+                <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: quickFinanceType === 'ingreso' ? '#15803d' : '#b91c1c', fontWeight: '800' }}>
+                  {quickFinanceType === 'ingreso' ? '🟢 Nuevo Ingreso' : '🔴 Nuevo Egreso'}
+                </h4>
+
                 <input 
                   type="number" 
-                  placeholder="$" 
+                  placeholder="Monto ($)" 
                   value={quickFinanceForm.amount}
                   onChange={(e) => setQuickFinanceForm({...quickFinanceForm, amount: e.target.value})}
-                  style={{ width: '70px', padding: '10px', borderRadius: '10px', border: '1px solid #ddd', outline: 'none', fontWeight: 'bold' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1.2rem', fontWeight: 'bold', boxSizing: 'border-box' }}
                 />
-                <input 
-                  type="text" 
-                  placeholder={quickFinanceType === 'ingreso' ? 'Ej: Sueldo' : 'Ej: Comida'} 
+                
+                <select 
                   value={quickFinanceForm.category}
                   onChange={(e) => setQuickFinanceForm({...quickFinanceForm, category: e.target.value})}
-                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #ddd', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', backgroundColor: '#f9fafb', fontSize: '1rem', boxSizing: 'border-box' }}
+                >
+                  <option value="">Seleccionar Categoría...</option>
+                  {(quickFinanceType === 'egreso' ? categoriasEgreso : categoriasIngreso).map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="Otra">Otra...</option>
+                </select>
+
+                {quickFinanceForm.category === 'Otra' && (
+                  <input 
+                    type="text" 
+                    placeholder="Escribí la categoría..." 
+                    onChange={(e) => setQuickFinanceForm({...quickFinanceForm, category: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem', boxSizing: 'border-box' }}
+                  />
+                )}
+
+                <input 
+                  type="text" 
+                  placeholder="Asunto o Detalle (opcional)" 
+                  value={quickFinanceForm.description}
+                  onChange={(e) => setQuickFinanceForm({...quickFinanceForm, description: e.target.value})}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem', boxSizing: 'border-box' }}
                 />
-                <button type="submit" style={{ padding: '10px 15px', backgroundColor: quickFinanceType === 'ingreso' ? '#22c55e' : '#ef4444', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
-                  {quickFinanceStatus || '✓'}
+
+                <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: quickFinanceType === 'ingreso' ? '#22c55e' : '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', marginTop: '5px' }}>
+                  {quickFinanceStatus || 'Guardar'}
                 </button>
               </form>
             </div>
@@ -325,7 +356,7 @@ export default function Home() {
         </div>
 
         {showParking && (
-          <div style={{ marginTop: '0.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
+          <div style={{ marginTop: '0.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee', animation: 'fadeIn 0.2s ease-out' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>
               Última ubicación: <strong style={{ color: '#111' }}>{parkingLoc}</strong>
             </p>
@@ -349,6 +380,12 @@ export default function Home() {
         ÉXITO APP • 2026
       </footer>
 
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </main>
   );
 }
