@@ -17,9 +17,10 @@ export default function Entrenamiento() {
   }, []);
 
   async function fetchData() {
+    // 1. Traer configuración de ejercicios
     const { data: t } = await supabase.from('workout_types').select('*').order('created_at');
     
-    // Obtenemos los registros de los últimos 31 días (aproximado para la vista mensual)
+    // 2. Traer registros de los últimos 31 días (para poder calcular metas mensuales y semanales)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 31);
     const dateString = thirtyDaysAgo.toISOString().split('T')[0];
@@ -83,7 +84,7 @@ export default function Entrenamiento() {
     if (!error) {
       alert('¡Entrenamiento registrado! 💪');
       setForm({});
-      fetchData(); 
+      fetchData(); // Recargar para actualizar barritas
     } else {
       console.error(error);
       alert('Error al guardar.');
@@ -157,7 +158,7 @@ export default function Entrenamiento() {
                       placeholder="¿Cuánto sumar hoy?" 
                       value={form[t.name] || ''}
                       onChange={(e) => setForm({...form, [t.name]: e.target.value})}
-                      style={{ flex: 1, padding: '1rem', borderRadius: '14px', border: '1px solid #ddd', outline: 'none', backgroundColor: '#f9fafb' }}
+                      style={{ width: '100%', padding: '1rem', borderRadius: '14px', border: '1px solid #ddd', outline: 'none', backgroundColor: '#f9fafb', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -178,32 +179,35 @@ export default function Entrenamiento() {
           
           <form onSubmit={addExercise} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '3rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Añadir nuevo ejercicio</h3>
+            
             <input 
               type="text" 
               placeholder="Nombre (ej: Sentadillas)" 
               value={newExercise.name}
               onChange={(e) => setNewExercise({...newExercise, name: e.target.value})}
-              style={{ padding: '1rem', borderRadius: '12px', border: '1px solid #ddd' }}
+              style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box' }}
             />
-            <div style={{ display: 'flex', gap: '10px' }}>
+            
+            {/* Contenedor Grid asegurando simetría */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%' }}>
               <input 
                 type="number" 
                 placeholder="Meta (ej: 100)" 
                 value={newExercise.goal_amount || ''}
                 onChange={(e) => setNewExercise({...newExercise, goal_amount: parseInt(e.target.value) || 0})}
-                style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid #ddd' }}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box' }}
               />
               <select 
                 value={newExercise.goal_period}
                 onChange={(e) => setNewExercise({...newExercise, goal_period: e.target.value})}
-                style={{ flex: 1, padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#fff' }}
+                style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #ddd', backgroundColor: '#fff', boxSizing: 'border-box' }}
               >
                 <option value="diario">Diario</option>
                 <option value="semanal">Semanal</option>
                 <option value="mensual">Mensual</option>
               </select>
             </div>
-            <button type="submit" style={{ padding: '1rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>
+            <button type="submit" style={{ width: '100%', padding: '1rem', backgroundColor: '#5D5CDE', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>
               + Agregar
             </button>
           </form>
@@ -212,17 +216,19 @@ export default function Entrenamiento() {
             {types.map(t => (
               <div key={t.id} style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <span style={{ fontWeight: '700', fontSize: '1.1rem' }}>{t.name}</span>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                
+                {/* Contenedor Grid asegurando simetría en la lista */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%' }}>
                   <input 
                     type="number" 
                     defaultValue={t.goal_amount}
                     onBlur={(e) => updateGoal(t.id, 'goal_amount', parseInt(e.target.value))}
-                    style={{ flex: 1, padding: '0.8rem', borderRadius: '10px', border: '1px solid #ddd' }}
+                    style={{ width: '100%', padding: '0.8rem', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box' }}
                   />
                   <select 
                     defaultValue={t.goal_period}
                     onChange={(e) => updateGoal(t.id, 'goal_period', e.target.value)}
-                    style={{ flex: 1, padding: '0.8rem', borderRadius: '10px', border: '1px solid #ddd', backgroundColor: '#fff' }}
+                    style={{ width: '100%', padding: '0.8rem', borderRadius: '10px', border: '1px solid #ddd', backgroundColor: '#fff', boxSizing: 'border-box' }}
                   >
                     <option value="diario">Diario</option>
                     <option value="semanal">Semanal</option>
