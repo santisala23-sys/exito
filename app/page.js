@@ -14,18 +14,23 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   // --- ESTADOS PARA ACCESOS RÁPIDOS ---
-  const [cigLogsToday, setCigLogsToday] = useState([]); // Guarda el historial de hoy
-  const [cigStatus, setCigStatus] = useState(''); 
+  const [cigLogsToday, setCigLogsToday] = useState([]);
+  const [cigStatus, setCigStatus] = useState('');
   const [showParking, setShowParking] = useState(false);
   const [parkingLoc, setParkingLoc] = useState('');
   const [parkingInput, setParkingInput] = useState('');
   const [parkingStatus, setParkingStatus] = useState('');
 
+  // --- ESTADOS PARA CARGA RÁPIDA DE FINANZAS ---
+  const [quickFinanceType, setQuickFinanceType] = useState(null); // 'ingreso' o 'egreso'
+  const [quickFinanceForm, setQuickFinanceForm] = useState({ amount: '', category: '' });
+  const [quickFinanceStatus, setQuickFinanceStatus] = useState('');
+
   useEffect(() => {
     async function initData() {
       const today = getToday();
 
-      // 1. Tasks Pendientes 
+      // 1. Tasks Pendientes
       const { data: tasksData } = await supabase.from('tasks').select('*').eq('completed', false).or(`due_date.lte.${today},due_date.is.null`);
       const tasksCount = tasksData ? tasksData.length : 0;
 
@@ -56,7 +61,7 @@ export default function Home() {
         setParkingInput(parkData.location === 'No registrado' ? '' : parkData.location);
       }
 
-      // 6. Cargar historial de cigarros de HOY (ajustado a zona horaria argentina)
+      // 6. Cargar historial de cigarros de HOY
       const { data: cigData } = await supabase.from('cigarettes_log').select('id, created_at').order('created_at', { ascending: false }).limit(100);
       if (cigData) {
         const todaysLogs = cigData.filter(log => {
@@ -67,7 +72,6 @@ export default function Home() {
           const dd = String(argD.getDate()).padStart(2, '0');
           return `${yyyy}-${mm}-${dd}` === today;
         });
-        // Invertimos para que el último del array sea el más reciente
         setCigLogsToday(todaysLogs.reverse());
       }
 
@@ -82,11 +86,11 @@ export default function Home() {
   // --- FUNCIONES DE CIGARRILLOS ---
   const logCigarette = async () => {
     setCigStatus('⏳');
-    const { data, error } = await supabase.from('cigarettes_log').insert([{}]).select(); 
+    const { data, error } = await supabase.from('cigarettes_log').insert([{}]).select();
     if (!error && data) {
       setCigLogsToday([...cigLogsToday, data[0]]);
       setCigStatus('✅ Registrado');
-      setTimeout(() => setCigStatus(''), 2000); 
+      setTimeout(() => setCigStatus(''), 2000);
     } else {
       setCigStatus('❌ Error');
       setTimeout(() => setCigStatus(''), 2000);
@@ -96,11 +100,10 @@ export default function Home() {
   const undoCigarette = async () => {
     if (cigLogsToday.length === 0) return;
     setCigStatus('⏳');
-    const lastLog = cigLogsToday[cigLogsToday.length - 1]; // Agarra el último registrado
-    
+    const lastLog = cigLogsToday[cigLogsToday.length - 1]; 
     const { error } = await supabase.from('cigarettes_log').delete().eq('id', lastLog.id);
     if (!error) {
-      setCigLogsToday(cigLogsToday.slice(0, -1)); // Lo saca de la pantalla
+      setCigLogsToday(cigLogsToday.slice(0, -1)); 
       setCigStatus('🗑️ Borrado');
       setTimeout(() => setCigStatus(''), 2000);
     } else {
@@ -120,22 +123,52 @@ export default function Home() {
     setParkingStatus('⏳');
     const newLocation = parkingInput.trim() || 'No registrado';
     const { error } = await supabase.from('parking').upsert({ id: 1, location: newLocation, updated_at: new Date() });
-    
     if (!error) {
       setParkingLoc(newLocation);
       setParkingStatus('✅ Guardado');
       setTimeout(() => {
         setParkingStatus('');
-        setShowParking(false); 
+        setShowParking(false);
       }, 1500);
     } else {
       setParkingStatus('❌ Error');
     }
   };
 
+  // --- FUNCIONES DE CARGA RÁPIDA FINANZAS ---
+  const handleQuickFinanceClick = (e, type) => {
+    e.preventDefault(); // Evita que el click abra la página /finanzas
+    setQuickFinanceType(quickFinanceType === type ? null : type); // Toggle del formulario
+    setQuickFinanceStatus('');
+  };
+
+  const saveQuickFinance = async (e) => {
+    e.preventDefault();
+    if (!quickFinanceForm.amount || !quickFinanceForm.category) return;
+    
+    setQuickFinanceStatus('⏳');
+    const { error } = await supabase.from('finances').insert([{
+      transaction_type: quickFinanceType,
+      amount: parseFloat(quickFinanceForm.amount),
+      category: quickFinanceForm.category,
+      description: 'Carga rápida',
+      date: getToday()
+    }]);
+
+    if (!error) {
+      setQuickFinanceStatus('✅');
+      setTimeout(() => {
+        setQuickFinanceType(null);
+        setQuickFinanceForm({ amount: '', category: '' });
+        setQuickFinanceStatus('');
+      }, 1500);
+    } else {
+      setQuickFinanceStatus('❌ Error');
+    }
+  };
+
   return (
     <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', fontFamily: '-apple-system, sans-serif', backgroundColor: '#fff', minHeight: '100vh', color: '#111' }}>
-      
       <header style={{ marginBottom: '3rem', textAlign: 'center' }}>
         <h1 style={{ fontSize: '2.8rem', fontWeight: '900', letterSpacing: '-0.05em', margin: '0 0 0.5rem 0' }}>Hola Santi</h1>
         <div style={{ display: 'inline-block', backgroundColor: totalPendientes === 0 ? '#166534' : '#000', color: '#fff', padding: '10px 25px', borderRadius: '30px', fontWeight: 'bold', fontSize: '1.1rem' }}>
@@ -168,18 +201,51 @@ export default function Home() {
             </span>
           </button>
         </Link>
-        
-        <Link href="/finanzas" style={{ textDecoration: 'none' }}>
-          <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>💸 Finanzas</span>
-              <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Billetera y gastos</span>
+
+        {/* --- TARJETA DE FINANZAS MODIFICADA --- */}
+        <div style={{ backgroundColor: '#10b981', borderRadius: '28px', overflow: 'hidden' }}>
+          <Link href="/finanzas" style={{ textDecoration: 'none' }}>
+            <button style={{ width: '100%', padding: '1.8rem', backgroundColor: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: '800' }}>💸 Finanzas</span>
+                <span style={{ fontSize: '0.9rem', opacity: 0.9 }}>Billetera y gastos</span>
+              </div>
+              
+              {/* BOTONES DE CARGA RÁPIDA (Dentro de la tarjeta pero detienen la navegación al hacer clic) */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div onClick={(e) => handleQuickFinanceClick(e, 'egreso')} style={{ width: '40px', height: '40px', backgroundColor: 'rgba(255,0,0,0.8)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>-</div>
+                <div onClick={(e) => handleQuickFinanceClick(e, 'ingreso')} style={{ width: '40px', height: '40px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '900', fontSize: '1.5rem', color: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>+</div>
+              </div>
+            </button>
+          </Link>
+
+          {/* FORMULARIO DESPLEGABLE RÁPIDO */}
+          {quickFinanceType && (
+            <div style={{ padding: '0 1.8rem 1.8rem 1.8rem', backgroundColor: '#10b981' }}>
+              <form onSubmit={saveQuickFinance} style={{ display: 'flex', gap: '10px', backgroundColor: '#fff', padding: '10px', borderRadius: '16px' }}>
+                <input 
+                  type="number" 
+                  placeholder="$" 
+                  value={quickFinanceForm.amount}
+                  onChange={(e) => setQuickFinanceForm({...quickFinanceForm, amount: e.target.value})}
+                  style={{ width: '70px', padding: '10px', borderRadius: '10px', border: '1px solid #ddd', outline: 'none', fontWeight: 'bold' }}
+                />
+                <input 
+                  type="text" 
+                  placeholder={quickFinanceType === 'ingreso' ? 'Ej: Sueldo' : 'Ej: Comida'} 
+                  value={quickFinanceForm.category}
+                  onChange={(e) => setQuickFinanceForm({...quickFinanceForm, category: e.target.value})}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #ddd', outline: 'none' }}
+                />
+                <button type="submit" style={{ padding: '10px 15px', backgroundColor: quickFinanceType === 'ingreso' ? '#22c55e' : '#ef4444', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {quickFinanceStatus || '✓'}
+                </button>
+              </form>
             </div>
-            <span style={{ fontSize: '1.5rem', fontWeight: '900', backgroundColor: 'rgba(0,0,0,0.15)', padding: '10px 20px', borderRadius: '18px' }}>
-              Ir
-            </span>
-          </button>
-        </Link>
+          )}
+        </div>
+        {/* ------------------------------------ */}
+
         <Link href="/nutricion" style={{ textDecoration: 'none' }}>
           <button style={{ width: '100%', padding: '1.8rem', backgroundColor: '#f3f4f6', color: '#000', border: 'none', borderRadius: '28px', cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -210,7 +276,6 @@ export default function Home() {
             <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: '800', color: '#fff' }}>Ver mis métricas</h2>
           </div>
         </Link>
-
       </div>
 
       {/* --- MÓDULO: ACCESOS RÁPIDOS --- */}
@@ -219,7 +284,6 @@ export default function Home() {
         
         <div style={{ display: 'flex', justifyContent: 'center', gap: '30px' }}>
           
-          {/* BOTÓN CIGARRO */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
               onClick={logCigarette}
@@ -244,7 +308,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* BOTÓN ESTACIONAMIENTO */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <button 
               onClick={toggleParking}
@@ -261,7 +324,6 @@ export default function Home() {
 
         </div>
 
-        {/* CAJÓN DESPLEGABLE DE ESTACIONAMIENTO */}
         {showParking && (
           <div style={{ marginTop: '0.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '20px', border: '1px solid #eee' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>
