@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Exito - App de Santi',
-  description: 'Control de hábitos y nutrición',
+  title: 'Exito',
+  description: 'para vos',
 }
 
 export default function RootLayout({ children }) {
